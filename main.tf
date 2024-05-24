@@ -1,5 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-
 terraform {
   required_providers {
     aws = {
@@ -7,6 +5,12 @@ terraform {
       version = "~> 4.0"
     }
   }
+}
+
+module "s3-bucket" {
+  source              = "cloudposse/s3-bucket/aws"
+  version             = "3.1.0"
+  s3_object_ownership = "BucketOwnerEnforced"
 }
 
 provider "aws" {
@@ -18,8 +22,7 @@ resource "aws_vpc" "hashicat" {
   enable_dns_hostnames = true
 
   tags = {
-    name        = "${var.prefix}-vpc-${var.region}"
-    environment = "Production"
+    name = "${var.prefix}-vpc-${var.region}"
   }
 }
 
@@ -128,7 +131,9 @@ resource "aws_instance" "hashicat" {
   vpc_security_group_ids      = [aws_security_group.hashicat.id]
 
   tags = {
-    Name = "${var.prefix}-hashicat-instance"
+    Name        = "${var.prefix}-hashicat-instance"
+    Environment = "prod"
+    Department  = "Hashicat Social"
   }
 }
 
@@ -144,6 +149,18 @@ resource "aws_instance" "hashicat" {
 # Set up some environment variables for our script.
 # Add execute permissions to our scripts.
 # Run the deploy_app.sh script.
+
+variable "docker_image" {
+  description = "The Docker image to run"
+  default     = "pengbai/docker-supermario"
+}
+
+variable "container_name" {
+  description = "The name of the Docker container"
+  default     = "supermario"
+}
+
+
 resource "null_resource" "configure-cat-app" {
   depends_on = [aws_eip_association.hashicat]
 
@@ -166,13 +183,16 @@ resource "null_resource" "configure-cat-app" {
   provisioner "remote-exec" {
     inline = [
       "sudo apt -y update",
-      "sleep 15",
+      "sudo apt -y install apt-transport-https ca-certificates curl software-properties-common",
+      "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -",
+      "sudo add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable'",
       "sudo apt -y update",
-      "sudo apt -y install apache2",
-      "sudo systemctl start apache2",
-      "sudo chown -R ubuntu:ubuntu /var/www/html",
-      "chmod +x *.sh",
-      "PLACEHOLDER=${var.placeholder} WIDTH=${var.width} HEIGHT=${var.height} PREFIX=${var.prefix} ./deploy_app.sh",
+      "sudo apt -y install docker-ce",
+      "sudo systemctl start docker",
+      "sudo systemctl enable docker",
+      "sudo usermod -aG docker ubuntu",
+      "sudo docker pull ${var.docker_image}",
+      "sudo docker run -d --name ${var.container_name} ${var.docker_image}",
       "sudo apt -y install cowsay",
       "cowsay Mooooooooooo!",
     ]

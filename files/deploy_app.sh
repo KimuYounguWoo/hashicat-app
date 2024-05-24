@@ -1,7 +1,5 @@
 #!/bin/bash
-# Copyright (c) HashiCorp, Inc.
-
-# Script to deploy a very simple web application.
+# Copyrighterraform o deploy a very simple web application.
 # The web app has a customizable image and some text.
 
 cat << EOM > /var/www/html/index.html
